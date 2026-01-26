@@ -1,30 +1,37 @@
 <?php
-header('Content-Type: application/json');
-require_once '../config.php';
+include '../config.php'; // Usa la configuración de InfinityFree
 
 $data = json_decode(file_get_contents('php://input'), true);
+$id_sucursal = 1; // Ajustar según sea necesario
+$productos = $data['productos'];
+$total = $data['total'];
 
 try {
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare("INSERT INTO ventas (id_sucursal, total_venta, fecha_hora) VALUES (?, ?, NOW())");
-    $stmt->execute([$data['sucursal_id'], $data['total']]);
-    $idVenta = $pdo->lastInsertId();
+    foreach ($productos as $item) {
+        // 1. Verificar stock actual antes de vender
+        $stmt = $pdo->prepare("SELECT cantidad_disponible FROM inventarios WHERE id_producto = ? AND id_sucursal = ?");
+        $stmt->execute([$item['id'], $id_sucursal]);
+        $stockActual = $stmt->fetchColumn();
 
-    foreach ($data['productos'] as $p) {
-        // Insertar detalle
-        $stmtDet = $pdo->prepare("INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)");
-        $stmtDet->execute([$idVenta, $p['id_producto'], $p['cantidad'], $p['precio_unitario']]);
+        if ($stockActual < $item['cantidad']) {
+            throw new Exception("Stock insuficiente para el producto ID: " . $item['id']);
+        }
 
-        // Restar stock
-        $stmtInv = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - ? WHERE id_producto = ? AND id_sucursal = ?");
-        $stmtInv->execute([$p['cantidad'], $p['id_producto'], $data['sucursal_id']]);
+        // 2. Restar del inventario
+        $update = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - ? WHERE id_producto = ? AND id_sucursal = ?");
+        $update->execute([$item['cantidad'], $item['id'], $id_sucursal]);
     }
 
+    // 3. Registrar la venta
+    $insVenta = $pdo->prepare("INSERT INTO ventas (id_sucursal, total_venta) VALUES (?, ?)");
+    $insVenta->execute([$id_sucursal, $total]);
+
     $pdo->commit();
-    echo json_encode(['status' => 'success']);
+    echo json_encode(["status" => "success"]);
 } catch (Exception $e) {
     $pdo->rollBack();
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
 ?>
