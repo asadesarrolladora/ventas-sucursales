@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Admin - Inventarios</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">Gestión de Inventario</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card shadow-sm p-3 mb-4">
+                    <h5>✨ Nuevo Producto</h5>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del Producto</label>
+                        <input type="text" id="nombreP" class="form-control" placeholder="Ej: Sabritas">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Precio al Público</label>
+                        <input type="number" id="precioP" class="form-control" placeholder="0.00">
+                    </div>
+                    <button class="btn btn-success w-100" onclick="guardarProducto()">Guardar Producto</button>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm p-3">
+                    <div class="d-flex justify-content-between">
+                        <h5>📦 Inventario Global</h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="cargarInventario()">🔄 Actualizar</button>
+                    </div>
+                    <table class="table table-hover mt-3">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Producto</th>
+                                <th>Sucursal</th>
+                                <th>Stock</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-inventario">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Función para guardar producto en la base de datos
+        async function guardarProducto() {
+            const nombre = document.getElementById('nombreP').value;
+            const precio = document.getElementById('precioP').value;
+
+            if(!nombre || !precio) return alert("Llena todos los campos");
+
+            const res = await fetch('api/admin_productos.php', {
+                method: 'POST',
+                body: JSON.stringify({ nombre, precio })
+            });
+
+            const data = await res.json();
+            if(data.status === 'success') {
+                alert("Producto creado con éxito");
+                location.reload(); // Recarga para ver cambios
+            }
+        }
+
+        // Función para ver el stock actual
+        async function cargarInventario() {
+            const res = await fetch('api/ver_inventario_completo.php');
+            const inventario = await res.json();
+            const tabla = document.getElementById('tabla-inventario');
+            
+            tabla.innerHTML = inventario.map(item => `
+                <tr>
+                    <td>${item.id_producto}</td>
+                    <td>${item.nombre}</td>
+                    <td>${item.nombre_sucursal}</td>
+                    <td><span class="badge ${item.cantidad_disponible < 10 ? 'bg-danger' : 'bg-success'}">
+                        ${item.cantidad_disponible} unidades
+                    </span></td>
+                </tr>
+            `).join('');
+        }
+
+        // Cargar datos al abrir la página
+        cargarInventario();
+    </script>
+</body>
+</html>
