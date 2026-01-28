@@ -107,6 +107,27 @@
         });
     }
 
+    // --- SEGURIDAD DE INTERFAZ POR ROL ---
+    (function aplicarPermisosRol() {
+    // Recuperamos el rol guardado durante el login
+    const rol = localStorage.getItem('user_rol');
+    const nombreUsuario = localStorage.getItem('user_nombre');
+
+    // 1. Si no es admin, ocultamos el botón de Panel Admin
+    if (rol !== 'admin') {
+        const btnAdmin = document.querySelector('a[href="admin.html"]');
+        if (btnAdmin) {
+            btnAdmin.style.display = 'none'; 
+        }
+    }
+
+    // 2. Opcional: Mostrar saludo al vendedor en la barra superior
+    const navbarBrand = document.querySelector('.navbar-brand');
+    if (navbarBrand && nombreUsuario) {
+        navbarBrand.innerHTML += ` <span class="small fw-normal ms-2">| Atiende: ${nombreUsuario}</span>`;
+    }
+    })();
+
     cargarProductos();
 </script>
 </body>

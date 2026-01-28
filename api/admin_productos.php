@@ -3,6 +3,27 @@ session_start();
 include '../config.php';
 header('Content-Type: application/json');
 
+// 1. Verificación de Sesión Básica
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401); // No autorizado
+    echo json_encode(["status" => "error", "message" => "Sesión no iniciada"]);
+    exit;
+}
+
+// 2. PROTECCIÓN EXTRA POR ROL
+// Solo permitimos el paso si el rol guardado en la sesión es 'admin'
+if ($_SESSION['rol'] !== 'admin') {
+    http_response_code(403); // Prohibido (Forbidden)
+    echo json_encode([
+        "status" => "error", 
+        "message" => "Acceso denegado: No tienes permisos de administrador para ver estos datos."
+    ]);
+    exit;
+}
+session_start();
+include '../config.php';
+header('Content-Type: application/json');
+
 // Protección de Seguridad
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(["status" => "error", "message" => "Acceso denegado. Inicie sesión."]);
