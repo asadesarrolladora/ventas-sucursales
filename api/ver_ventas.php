@@ -1,9 +1,15 @@
 <?php
+session_start();
 include '../config.php';
 header('Content-Type: application/json');
 
+// Protección de Seguridad
+if (!isset($_SESSION['user_id'])) {
+    die(json_encode(["error" => "No autorizado"]));
+}
+
 try {
-    // Consultamos las ventas y detalles en una sola lista
+    // Consulta que une ventas con nombres de productos
     $query = "SELECT v.id_venta, v.fecha, v.total, p.nombre as producto 
               FROM ventas v
               JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
