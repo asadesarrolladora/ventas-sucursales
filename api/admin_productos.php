@@ -1,56 +1,60 @@
 <?php
 session_start();
 include '../config.php';
+
+// Establecer cabecera para respuesta JSON
 header('Content-Type: application/json');
 
-// 1. Verificación de Sesión Básica
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401); // No autorizado
-    echo json_encode(["status" => "error", "message" => "Sesión no iniciada"]);
+// 1. Verificación de seguridad: Solo el administrador puede modificar el stock
+if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'admin') {
+    http_response_code(403);
+    echo json_encode(["status" => "error", "message" => "Acceso denegado: Se requieren permisos de administrador"]);
     exit;
 }
 
-// 2. PROTECCIÓN EXTRA POR ROL
-// Solo permitimos el paso si el rol guardado en la sesión es 'admin'
-if ($_SESSION['rol'] !== 'admin') {
-    http_response_code(403); // Prohibido (Forbidden)
-    echo json_encode([
-        "status" => "error", 
-        "message" => "Acceso denegado: No tienes permisos de administrador para ver estos datos."
-    ]);
-    exit;
-}
-session_start();
-include '../config.php';
-header('Content-Type: application/json');
-
-// Protección de Seguridad
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(["status" => "error", "message" => "Acceso denegado. Inicie sesión."]);
-    exit;
-}
-
+// 2. Procesar la solicitud POST del formulario de admin.html
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre = $_POST['nombre'] ?? '';
-    $precio = $_POST['precio'] ?? 0;
-    $stock = $_POST['stock'] ?? 0;
+    
+    // Validar que los campos no estén vacíos
+    if (empty($_POST['nombre']) || !isset($_POST['precio']) || !isset($_POST['stock'])) {
+        echo json_encode(["status" => "error", "message" => "Todos los campos son obligatorios"]);
+        exit;
+    }
+
+    $nombre = trim($_POST['nombre']);
+    $precio = floatval($_POST['precio']);
+    $stock_nuevo = intval($_POST['stock']);
+
+    /* LÓGICA ANTI-DUPLICADOS:
+       Usamos 'ON DUPLICATE KEY UPDATE'. 
+       Si el nombre ya existe en la base de datos:
+       - cantidad_disponible: se suma el nuevo valor al que ya existía (ej: 9 + 1 = 10)
+       - precio_base: se actualiza al precio más reciente ingresado.
+    */
+    $sql = "INSERT INTO productos (nombre, precio_base, cantidad_disponible) 
+            VALUES (?, ?, ?) 
+            ON DUPLICATE KEY UPDATE 
+            cantidad_disponible = cantidad_disponible + VALUES(cantidad_disponible),
+            precio_base = VALUES(precio_base)";
 
     try {
-        $pdo->beginTransaction();
-        // Insertar producto base
-        $stmt = $pdo->prepare("INSERT INTO productos (nombre, precio_base) VALUES (?, ?)");
-        $stmt->execute([$nombre, $precio]);
-        $id_nuevo = $pdo->lastInsertId();
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sdi", $nombre, $precio, $stock_nuevo);
 
-        // Insertar stock en sucursal 1
-        $stmtInv = $pdo->prepare("INSERT INTO inventarios (id_producto, id_sucursal, cantidad_disponible) VALUES (?, 1, ?)");
-        $stmtInv->execute([$id_nuevo, $stock]);
-
-        $pdo->commit();
-        echo json_encode(["status" => "success", "message" => "Producto guardado"]);
+        if ($stmt->execute()) {
+            echo json_encode([
+                "status" => "success", 
+                "message" => "Inventario actualizado correctamente para: " . $nombre
+            ]);
+        } else {
+            throw new Exception($conn->error);
+        }
     } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        echo json_encode(["status" => "error", "message" => "Error en la base de datos: " . $e->getMessage()]);
     }
+} else {
+    // Si intentan entrar por URL directa sin enviar el formulario
+    http_response_code(405);
+    echo json_encode(["status" => "error", "message" => "Método no permitido"]);
 }
 ?>

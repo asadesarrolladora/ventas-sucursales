@@ -2,94 +2,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso al Sistema - POS</title>
+    <title>Acceso al Sistema</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { 
-            background: linear-gradient(135deg, #0d6efd 0%, #1a237e 100%); 
-            height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .card { 
-            width: 380px; 
-            border-radius: 20px; 
-            border: none; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        .btn-primary { border-radius: 10px; padding: 12px; font-weight: bold; }
-        .form-control { border-radius: 10px; padding: 12px; }
+        body { background: #0d6efd; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { width: 350px; border-radius: 15px; }
     </style>
 </head>
 <body>
-
-<div class="card p-4">
-    <div class="text-center mb-4">
-        <h2 class="fw-bold text-primary">Bienvenido</h2>
-        <p class="text-muted">Inicia sesión para continuar</p>
+    <div class="card shadow p-4">
+        <h3 class="text-center mb-4">Bienvenido</h3>
+        <form id="formLogin">
+            <div class="mb-3">
+                <label class="form-label">Usuario</label>
+                <input type="text" id="user" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="pass" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Entrar al Sistema</button>
+        </form>
     </div>
 
-    <form id="formLogin">
-        <div class="mb-3">
-            <label class="form-label small fw-bold text-uppercase">Usuario</label>
-            <input type="text" id="user" class="form-control" placeholder="Nombre de usuario" required>
-        </div>
-        <div class="mb-4">
-            <label class="form-label small fw-bold text-uppercase">Contraseña</label>
-            <input type="password" id="pass" class="form-control" placeholder="••••••••" required>
-        </div>
-        <button type="submit" class="btn btn-primary w-100 mb-3">INGRESAR</button>
-    </form>
-    
-    <div id="mensajeError" class="alert alert-danger d-none small text-center" role="alert"></div>
-</div>
+    <script>
+        // Al cargar el login, limpiamos cualquier sesión vieja
+        localStorage.clear();
 
-<script>
-    document.getElementById('formLogin').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const errorDiv = document.getElementById('mensajeError');
-        errorDiv.classList.add('d-none');
-
-        const usuario = document.getElementById('user').value;
-        const password = document.getElementById('pass').value;
-
-        fetch('api/login.php', {
-            method: 'POST',
-            headers: { 'Content-Type: application/json' },
-            body: JSON.stringify({ usuario, password })
-        })
-        .then(res => res.json())
-        .then(res => {
-            if(res.status === 'success') {
-                // 1. Guardar el rol en el almacenamiento local para la interfaz
-                localStorage.setItem('user_rol', res.rol);
-                localStorage.setItem('user_nombre', usuario);
-
-                // 2. Redirección inteligente según el rol
-                if(res.rol === 'admin') {
-                    // El admin va directo al panel de gestión de stock
-                    window.location.href = 'admin.html';
+        document.getElementById('formLogin').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            fetch('api/login.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    usuario: document.getElementById('user').value,
+                    password: document.getElementById('pass').value
+                })
+            })
+            .then(res => {
+                // Verificamos si la respuesta es JSON real
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    return res.json();
                 } else {
-                    // El vendedor va directo al punto de venta
-                    window.location.href = 'index.html';
+                    // Si es HTML (el error de aes.js), recargamos para validar
+                    location.reload();
+                    throw new Error("Validando servidor...");
                 }
-            } else {
-                // Mostrar error si las credenciales fallan
-                errorDiv.innerText = res.message;
-                errorDiv.classList.remove('d-none');
-            }
-        })
-        .catch(err => {
-            console.error("Error de conexión:", err);
-            errorDiv.innerText = "Error al conectar con el servidor.";
-            errorDiv.classList.remove('d-none');
+            })
+            .then(res => {
+                if(res.status === 'success') {
+                    localStorage.setItem('user_rol', res.rol);
+                    localStorage.setItem('user_nombre', document.getElementById('user').value);
+                    window.location.href = (res.rol === 'admin') ? 'admin.html' : 'index.html';
+                } else {
+                    alert(res.message);
+                }
+            })
+            .catch(err => console.log("Reintentando por seguridad de hosting..."));
         });
-    });
-</script>
-
+    </script>
 </body>
 </html>
