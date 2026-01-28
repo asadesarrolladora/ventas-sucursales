@@ -1,32 +1,26 @@
 <?php
-include '../config.php'; // Usa la configuración de InfinityFree
+include '../config.php';
+header('Content-Type: application/json');
 
 $data = json_decode(file_get_contents('php://input'), true);
-$id_sucursal = 1; // Ajustar según sea necesario
-$productos = $data['productos'];
-$total = $data['total'];
 
 try {
     $pdo->beginTransaction();
 
-    foreach ($productos as $item) {
-        // 1. Verificar stock actual antes de vender
-        $stmt = $pdo->prepare("SELECT cantidad_disponible FROM inventarios WHERE id_producto = ? AND id_sucursal = ?");
-        $stmt->execute([$item['id'], $id_sucursal]);
-        $stockActual = $stmt->fetchColumn();
+    // 1. Insertar la venta global
+    $stmtVenta = $pdo->prepare("INSERT INTO ventas (total, id_sucursal) VALUES (?, 1)");
+    $stmtVenta->execute([$data['total']]);
+    $idVenta = $pdo->lastInsertId();
 
-        if ($stockActual < $item['cantidad']) {
-            throw new Exception("Stock insuficiente para el producto ID: " . $item['id']);
-        }
+    foreach ($data['productos'] as $prod) {
+        // 2. Insertar el detalle
+        $stmtDetalle = $pdo->prepare("INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, 1, ?)");
+        $stmtDetalle->execute([$idVenta, $prod['id'], $prod['precio']]);
 
-        // 2. Restar del inventario
-        $update = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - ? WHERE id_producto = ? AND id_sucursal = ?");
-        $update->execute([$item['cantidad'], $item['id'], $id_sucursal]);
+        // 3. DESCONTAR STOCK (Importante)
+        $stmtStock = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - 1 WHERE id_producto = ? AND id_sucursal = 1");
+        $stmtStock.execute([$prod['id']]);
     }
-
-    // 3. Registrar la venta
-    $insVenta = $pdo->prepare("INSERT INTO ventas (id_sucursal, total_venta) VALUES (?, ?)");
-    $insVenta->execute([$id_sucursal, $total]);
 
     $pdo->commit();
     echo json_encode(["status" => "success"]);
