@@ -2,83 +2,99 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Panel Admin - Inventarios</title>
-    <link rel="stylesheet" href="css/estilos.css"> </head>
-<body>
-    <header style="background: #2196F3; color: white; padding: 20px; text-align: center;">
-        <h1>Gestión de Inventario</h1>
-    </header>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Inventario</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .bg-header { background: #0d6efd; color: white; }
+        .card { border-radius: 12px; border: none; }
+    </style>
+</head>
+<body class="bg-light">
 
-    <div style="display: flex; padding: 20px; gap: 20px;">
-        <div style="flex: 1; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-            <h3>✨ Nuevo Producto</h3>
-            <form id="formProducto">
-                <label>Nombre del Producto</label><br>
-                <input type="text" name="nombre" id="nombre" placeholder="Ej: Sabritas" required style="width: 100%; margin-bottom: 10px;"><br>
-                
-                <label>Precio al Público</label><br>
-                <input type="number" step="0.01" name="precio" id="precio" placeholder="0.00" required style="width: 100%; margin-bottom: 10px;"><br>
-                
-                <label>Stock Inicial</label><br>
-                <input type="number" name="stock" id="stock" value="0" min="0" required style="width: 100%; margin-bottom: 20px;"><br>
-                
-                <button type="submit" style="background: #2e7d32; color: white; border: none; padding: 10px; width: 100%; cursor: pointer;">Guardar Producto</button>
-            </form>
+<nav class="navbar bg-header shadow mb-4">
+    <div class="container">
+        <span class="navbar-brand fw-bold text-white"><i class="bi bi-box-seam me-2"></i>Gestión de Stock</span>
+        <a href="index.html" class="btn btn-outline-light btn-sm">Ir a Ventas</a>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm p-4">
+                <h5 class="fw-bold mb-4">✨ Nuevo Producto</h5>
+                <form id="formProducto">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Nombre</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Cargador hp" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Precio</label>
+                        <input type="number" step="0.01" name="precio" class="form-control" placeholder="0.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Stock Inicial</label>
+                        <input type="number" name="stock" class="form-control" value="0" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Guardar Producto</button>
+                </form>
+            </div>
         </div>
 
-        <div style="flex: 2; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-            <h3>📦 Inventario Global</h3>
-            <table border="1" style="width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr style="background: #eee;">
-                        <th>ID</th>
-                        <th>Producto</th>
-                        <th>Stock Actual</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaInventario">
-                    </tbody>
-            </table>
+        <div class="col-md-8">
+            <div class="card shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">📦 Inventario</h5>
+                    <button onclick="cargarInventario()" class="btn btn-light btn-sm"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr><th>ID</th><th>Producto</th><th class="text-center">Stock</th></tr>
+                        </thead>
+                        <tbody id="tablaInventario"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 
-    <script>
-        // Cargar inventario al iniciar
-        function cargarInventario() {
-            fetch('api/ver_inventario_completo.php')
-                .then(res => res.json())
-                .then(data => {
-                    const tabla = document.getElementById('tablaInventario');
-                    tabla.innerHTML = data.map(p => `
-                        <tr>
-                            <td>${p.id_producto}</td>
-                            <td>${p.nombre}</td>
-                            <td style="color: ${p.cantidad_disponible <= 0 ? 'red' : 'green'}">
-                                ${p.cantidad_disponible} unidades
-                            </td>
-                        </tr>
-                    `).join('');
-                });
-        }
-
-        // Guardar producto
-        document.getElementById('formProducto').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            
-            fetch('api/admin_productos.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.text())
-            .then(msg => {
-                alert(msg);
-                this.reset();
-                cargarInventario();
+<script>
+    function cargarInventario() {
+        fetch('api/ver_inventario_completo.php')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.getElementById('tablaInventario');
+                tbody.innerHTML = data.map(p => `
+                    <tr>
+                        <td>#${p.id_producto}</td>
+                        <td>${p.nombre}</td>
+                        <td class="text-center">
+                            <span class="badge ${p.cantidad_disponible > 0 ? 'bg-success' : 'bg-danger'} rounded-pill">
+                                ${p.cantidad_disponible} unid.
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
             });
-        });
+    }
 
-        cargarInventario();
-    </script>
+    document.getElementById('formProducto').onsubmit = function(e) {
+        e.preventDefault();
+        fetch('api/admin_productos.php', { method: 'POST', body: new FormData(this) })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'success') {
+                    this.reset();
+                    cargarInventario();
+                } else { alert("Error: " + res.message); }
+            });
+    };
+
+    cargarInventario();
+</script>
 </body>
 </html>
