@@ -1,31 +1,42 @@
 <?php
+// Asegúrate de que no haya espacios antes de esta etiqueta
 include '../config.php';
-header('Content-Type: application/json');
 
-$data = json_decode(file_get_contents('php://input'), true);
+// Esto ayuda a que el navegador ignore el reto de seguridad en peticiones AJAX
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *'); 
+
+$json = file_get_contents('php://input');
+$data = json_decode($json, true);
+
+if (!$data) {
+    echo json_encode(["status" => "error", "message" => "Cuerpo de solicitud vacío"]);
+    exit;
+}
 
 try {
     $pdo->beginTransaction();
 
-    // 1. Insertar la venta global
-    $stmtVenta = $pdo->prepare("INSERT INTO ventas (total, id_sucursal) VALUES (?, 1)");
-    $stmtVenta->execute([$data['total']]);
+    // Insertar venta
+    $stmtV = $pdo->prepare("INSERT INTO ventas (total, id_sucursal) VALUES (?, 1)");
+    $stmtV->execute([$data['total']]);
     $idVenta = $pdo->lastInsertId();
 
     foreach ($data['productos'] as $prod) {
-        // 2. Insertar el detalle
-        $stmtDetalle = $pdo->prepare("INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, 1, ?)");
-        $stmtDetalle->execute([$idVenta, $prod['id'], $prod['precio']]);
+        // Insertar detalle
+        $stmtD = $pdo->prepare("INSERT INTO detalle_ventas (id_venta, id_producto, cantidad, precio_unitario) VALUES (?, ?, 1, ?)");
+        $stmtD->execute([$idVenta, $prod['id'], $prod['precio']]);
 
-        // 3. DESCONTAR STOCK (Importante)
-        $stmtStock = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - 1 WHERE id_producto = ? AND id_sucursal = 1");
-        $stmtStock.execute([$prod['id']]);
+        // Actualizar stock
+        $stmtS = $pdo->prepare("UPDATE inventarios SET cantidad_disponible = cantidad_disponible - 1 WHERE id_producto = ? AND id_sucursal = 1");
+        $stmtS->execute([$prod['id']]);
     }
 
     $pdo->commit();
     echo json_encode(["status" => "success"]);
+
 } catch (Exception $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
 ?>
