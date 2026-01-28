@@ -2,82 +2,158 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>POS - Sistema de Ventas</title>
-    <link rel="stylesheet" href="css/estilos.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - Punto de Venta</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .product-card { transition: transform 0.2s; cursor: pointer; border: none; shadow-sm; }
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .cart-container { position: sticky; top: 20px; max-height: 80vh; overflow-y: auto; }
+        .bg-dark-blue { background-color: #1a237e; color: white; }
+    </style>
 </head>
-<body>
-    <header style="background: #333; color: white; padding: 15px;">
-        <h2>Punto de Venta Multi-Sucursal</h2>
-    </header>
+<body class="bg-light">
 
-    <div style="display: flex; padding: 20px; gap: 20px;">
-        <div style="flex: 2;" id="contenedorProductos">
-            </div>
-
-        <div style="flex: 1; border: 1px solid #ccc; padding: 15px; border-radius: 5px;">
-            <h3>🛒 Carrito</h3>
-            <div id="listaCarrito">No hay productos seleccionados</div>
-            <hr>
-            <h4>Total: $<span id="totalVenta">0.00</span></h4>
-            <button id="btnVenta" style="background: #007bff; color: white; width: 100%; padding: 15px; border: none; font-size: 18px; cursor: pointer;">REGISTRAR VENTA</button>
+<nav class="navbar navbar-expand-lg bg-dark-blue shadow-sm mb-4">
+    <div class="container">
+        <span class="navbar-brand fw-bold text-white"><i class="bi bi-shop me-2"></i>Mi Tienda POS</span>
+        <div class="d-flex">
+            <a href="admin.html" class="btn btn-outline-light btn-sm"><i class="bi bi-person-badge me-1"></i>Modo Admin</a>
         </div>
     </div>
+</nav>
 
-    <script>
-        let carrito = [];
+<div class="container">
+    <div class="row g-4">
+        <div class="col-md-8">
+            <div class="mb-4">
+                <input type="text" id="buscador" class="form-control form-control-lg shadow-sm" placeholder="🔍 Buscar producto por nombre..." onkeyup="filtrarProductos()">
+            </div>
+            <div class="row row-cols-1 row-cols-md-3 g-3" id="catalogo">
+                </div>
+        </div>
 
-        // Cargar productos con validación de stock
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 cart-container">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-cart3 me-2"></i>Carrito</h5>
+                </div>
+                <div class="card-body">
+                    <div id="listaCarrito" class="mb-3 text-muted">
+                        No hay productos seleccionados
+                    </div>
+                    <div class="border-top pt-3">
+                        <div class="d-flex justify-content-between h4 mb-3">
+                            <span>Total:</span>
+                            <span class="text-success fw-bold">$<span id="totalVenta">0.00</span></span>
+                        </div>
+                        <button id="btnVenta" class="btn btn-primary w-100 py-3 fw-bold shadow-sm" onclick="registrarVenta()" disabled>
+                            <i class="bi bi-cash-stack me-2"></i>REGISTRAR VENTA
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let carrito = [];
+    let productosData = [];
+
+    // Cargar productos desde la API
+    function cargarProductos() {
         fetch('api/productos.php')
             .then(res => res.json())
-            .then(productos => {
-                const contenedor = document.getElementById('contenedorProductos');
-                contenedor.innerHTML = productos.map(p => `
-                    <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; opacity: ${p.cantidad_disponible <= 0 ? '0.5' : '1'}">
-                        <strong>${p.nombre}</strong> - $${p.precio_base} <br>
-                        <small>Stock: ${p.cantidad_disponible}</small> <br>
+            .then(data => {
+                productosData = data;
+                mostrarCatalogo(data);
+            });
+    }
+
+    function mostrarCatalogo(productos) {
+        const catalogo = document.getElementById('catalogo');
+        catalogo.innerHTML = productos.map(p => `
+            <div class="col">
+                <div class="card h-100 product-card shadow-sm ${p.cantidad_disponible <= 0 ? 'opacity-50' : ''}">
+                    <div class="card-body text-center">
+                        <h6 class="fw-bold mb-1">${p.nombre}</h6>
+                        <p class="text-primary h5 mb-2">$${p.precio_base}</p>
+                        <p class="small text-muted mb-3">Stock: ${p.cantidad_disponible}</p>
                         ${p.cantidad_disponible > 0 
-                            ? `<button onclick="agregarAlCarrito(${p.id_producto}, '${p.nombre}', ${p.precio_base})">Agregar</button>`
-                            : `<b style="color:red">AGOTADO</b>`
+                            ? `<button class="btn btn-outline-primary btn-sm w-100 rounded-pill" onclick="agregar(${p.id_producto}, '${p.nombre}', ${p.precio_base})">Agregar</button>`
+                            : `<span class="badge bg-danger rounded-pill">Agotado</span>`
                         }
                     </div>
-                `).join('');
-            });
+                </div>
+            </div>
+        `).join('');
+    }
 
-        function agregarAlCarrito(id, nombre, precio) {
-            carrito.push({id, nombre, precio, cantidad: 1});
-            actualizarCarrito();
+    function filtrarProductos() {
+        const busqueda = document.getElementById('buscador').value.toLowerCase();
+        const filtrados = productosData.filter(p => p.nombre.toLowerCase().includes(busqueda));
+        mostrarCatalogo(filtrados);
+    }
+
+    function agregar(id, nombre, precio) {
+        carrito.push({id, nombre, precio});
+        actualizarCarrito();
+    }
+
+    function actualizarCarrito() {
+        const lista = document.getElementById('listaCarrito');
+        const totalTxt = document.getElementById('totalVenta');
+        const btnVenta = document.getElementById('btnVenta');
+
+        if (carrito.length === 0) {
+            lista.innerHTML = 'No hay productos seleccionados';
+            btnVenta.disabled = true;
+            totalTxt.innerText = '0.00';
+            return;
         }
 
-        function actualizarCarrito() {
-            const lista = document.getElementById('listaCarrito');
-            const totalTxt = document.getElementById('totalVenta');
-            let total = 0;
+        btnVenta.disabled = false;
+        let total = 0;
+        lista.innerHTML = carrito.map((item, index) => {
+            total += item.precio;
+            return `
+                <div class="d-flex justify-content-between align-items-center mb-2 small border-bottom pb-1">
+                    <span>${item.nombre}</span>
+                    <div>
+                        <span class="fw-bold">$${item.precio}</span>
+                        <i class="bi bi-x-circle text-danger ms-2 cursor-pointer" onclick="eliminar(${index})"></i>
+                    </div>
+                </div>`;
+        }).join('');
+        totalTxt.innerText = total.toFixed(2);
+    }
 
-            lista.innerHTML = carrito.map(i => {
-                total += i.precio;
-                return `<div>${i.nombre} - $${i.precio}</div>`;
-            }).join('');
-            
-            totalTxt.innerText = total.toFixed(2);
-        }
+    function eliminar(index) {
+        carrito.splice(index, 1);
+        actualizarCarrito();
+    }
 
-        document.getElementById('btnVenta').addEventListener('click', () => {
-            if (carrito.length === 0) return alert("Carrito vacío");
-
-            fetch('api/registrar_venta.php', {
-                method: 'POST',
-                body: JSON.stringify({ productos: carrito, total: document.getElementById('totalVenta').innerText })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === 'success') {
-                    alert("Venta registrada con éxito");
-                    location.reload();
-                } else {
-                    alert("Error: " + res.message); // Aquí mostrará el error de "Stock insuficiente"
-                }
-            });
+    function registrarVenta() {
+        fetch('api/registrar_venta.php', {
+            method: 'POST',
+            body: JSON.stringify({ productos: carrito, total: document.getElementById('totalVenta').innerText })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if(res.status === 'success') {
+                alert("✅ Venta realizada con éxito");
+                carrito = [];
+                actualizarCarrito();
+                cargarProductos(); // Refrescar stock visualmente
+            } else {
+                alert("❌ Error: " + res.message);
+            }
         });
-    </script>
+    }
+
+    cargarProductos();
+</script>
 </body>
 </html>
